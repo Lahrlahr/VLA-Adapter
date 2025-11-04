@@ -26,7 +26,6 @@ from torch.utils.data import DataLoader
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
 from transformers.modeling_outputs import CausalLMOutputWithPast
 import wandb
-
 from experiments.robot.openvla_utils import (
     check_model_logic_mismatch,
     model_is_on_hf_hub,
@@ -52,13 +51,17 @@ from prismatic.vla.constants import (
     ACTION_PROPRIO_NORMALIZATION_TYPE,
     NUM_ACTIONS_CHUNK,
     PROPRIO_DIM,
-    NUM_TOKENS
+    NUM_TOKENS,
+    NormalizationType
 )
 from prismatic.vla.datasets import RLDSDataset, RLDSBatchTransform
 from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
 from prismatic.models import load, load_vla
 
-
+import json
+from patch.dataset import VLAAdapterDataset, VLAAdapterCollator
+from torch.utils.data.distributed import DistributedSampler
+from typing import List, Union, Optional
 
 # Sane Defaults
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -126,7 +129,8 @@ class FinetuneConfig:
     use_pro_version: bool = True                             # the version number
     phase: str = "Training"
     # fmt: on
-
+    patch: bool = False
+    json_path: Union[str, List[str]] = ''
 
 
 def remove_ddp_in_checkpoint(state_dict) -> dict:
@@ -398,12 +402,12 @@ def run_forward_pass(
         for item in output.hidden_states[0:]:
             # last_hidden_states = output.hidden_states[-1]  # (B, seq_len, D)
             # Get hidden states for text portion of prompt+response (after the vision patches)
-            text_hidden_states = item[:, num_patches:-1]
+            text_hidden_states = item[:, num_patches:-1]#todo num_patches+1?
             # Get hidden states for action portion of response
             batch_size = batch["input_ids"].shape[0]
             # actions_hidden_states = text_hidden_states[:, -1, :].reshape(batch_size, 1, -1).to(torch.bfloat16)
             actions_hidden_states = text_hidden_states[current_action_mask | next_actions_mask].reshape(batch_size, 1,NUM_TOKENS, -1).to(torch.bfloat16)
-            task_latten_states = item[:, :num_patches].reshape(batch_size, 1, num_patches , -1)
+            task_latten_states = item[:, :num_patches].reshape(batch_size, 1, num_patches , -1)#todo 1:num_patches+1?
             all_hidden_states = torch.cat((task_latten_states, actions_hidden_states),2)
             multi_layer_hidden_states.append(all_hidden_states)
         multi_layer_hidden_states = torch.cat(multi_layer_hidden_states, dim = 1)
@@ -537,7 +541,12 @@ def save_training_checkpoint(
     if distributed_state.is_main_process:
         os.makedirs(checkpoint_dir, exist_ok=True)
         os.makedirs(adapter_dir, exist_ok=True)
-        save_dataset_statistics(train_dataset.dataset_statistics, checkpoint_dir)
+        if cfg.patch:
+            out_path = run_dir / "dataset_statistics.json"
+            with open(out_path, "w") as f_json:
+                json.dump(train_dataset.dataset_statistics, f_json, indent=2)
+        else:
+            save_dataset_statistics(train_dataset.dataset_statistics, run_dir)
         print(f"Saving Model Checkpoint for Step {log_step}")
 
     # Wait for directories to be created
@@ -713,8 +722,34 @@ def finetune(cfg: FinetuneConfig) -> None:
     cfg.config_file_path = cfg.config_file_path.rstrip("/")
     print(f"Fine-tuning OpenVLA Model `{cfg.config_file_path}` on `{cfg.dataset_name}`")
 
+    if cfg.patch:
+        aa_CONSTANTS = {
+            "NUM_ACTIONS_CHUNK": 8,
+            "ACTION_DIM": 14,
+            "PROPRIO_DIM": 14,
+            "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS_Q99,
+        }
+        constants = aa_CONSTANTS
+        NUM_ACTIONS_CHUNK = constants["NUM_ACTIONS_CHUNK"]
+        ACTION_DIM = constants["ACTION_DIM"]
+        PROPRIO_DIM = constants["PROPRIO_DIM"]
+        ACTION_PROPRIO_NORMALIZATION_TYPE = constants["ACTION_PROPRIO_NORMALIZATION_TYPE"]
+    else:
+        LIBERO_CONSTANTS = {
+            "NUM_ACTIONS_CHUNK": 8,
+            "ACTION_DIM": 7,
+            "PROPRIO_DIM": 8,
+            "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS_Q99,
+        }
+        constants = LIBERO_CONSTANTS
+        NUM_ACTIONS_CHUNK = constants["NUM_ACTIONS_CHUNK"]
+        ACTION_DIM = constants["ACTION_DIM"]
+        PROPRIO_DIM = constants["PROPRIO_DIM"]
+        ACTION_PROPRIO_NORMALIZATION_TYPE = constants["ACTION_PROPRIO_NORMALIZATION_TYPE"]
+
     # Get experiment run ID
-    run_id = get_run_id(cfg)
+    # run_id = get_run_id(cfg)
+    run_id = cfg.run_id_note
 
     # Create experiment run directory
     run_dir = cfg.run_root_dir / run_id
@@ -825,7 +860,10 @@ def finetune(cfg: FinetuneConfig) -> None:
             ).to(device_id)
 
     # Set number of images in VLA input
-    vla.vision_backbone.set_num_images_in_input(cfg.num_images_in_input)
+    if cfg.patch:
+        vla.vision_backbone.set_num_images_in_input(3)
+    else:
+        vla.vision_backbone.set_num_images_in_input(cfg.num_images_in_input)
 
     # vla.set_version(cfg.version)
 
@@ -891,6 +929,7 @@ def finetune(cfg: FinetuneConfig) -> None:
             "hidden_dim": vla.module.llm_dim, 
             "action_dim": ACTION_DIM,
             "use_pro_version": cfg.use_pro_version,
+            'num_task_tokens' : 768 if cfg.patch else 512
             },
         to_bf16=True,
         )
@@ -949,23 +988,26 @@ def finetune(cfg: FinetuneConfig) -> None:
     use_wrist_image = cfg.num_images_in_input > 1
 
     # Create training and optional validation datasets
-    batch_transform = RLDSBatchTransform(
-        action_tokenizer,
-        processor.tokenizer,
-        image_transform=processor.image_processor.apply_transform,
-        prompt_builder_fn=PurePromptBuilder,
-        use_wrist_image=use_wrist_image,
-        use_proprio=cfg.use_proprio,
-        use_minivlm=cfg.use_minivlm
+    if cfg.patch:
+        train_dataset = VLAAdapterDataset(cfg.json_path, 8, processor)
+    else:
+        batch_transform = RLDSBatchTransform(
+            action_tokenizer,
+            processor.tokenizer,
+            image_transform=processor.image_processor.apply_transform,
+            prompt_builder_fn=PurePromptBuilder,
+            use_wrist_image=use_wrist_image,
+            use_proprio=cfg.use_proprio,
+            use_minivlm=cfg.use_minivlm
+            )
+        train_dataset = RLDSDataset(
+            cfg.data_root_dir,
+            cfg.dataset_name,
+            batch_transform,
+            resize_resolution=tuple(vla.module.config.image_sizes),
+            shuffle_buffer_size=cfg.shuffle_buffer_size,
+            image_aug=cfg.image_aug,
         )
-    train_dataset = RLDSDataset(
-        cfg.data_root_dir,
-        cfg.dataset_name,
-        batch_transform,
-        resize_resolution=tuple(vla.module.config.image_sizes),
-        shuffle_buffer_size=cfg.shuffle_buffer_size,
-        image_aug=cfg.image_aug,
-    )
     if cfg.use_val_set:
         val_dataset = RLDSDataset(
             cfg.data_root_dir,
@@ -979,19 +1021,41 @@ def finetune(cfg: FinetuneConfig) -> None:
 
     # [Important] Save dataset statistics so that we can unnormalize actions during inference
     if distributed_state.is_main_process:
-        save_dataset_statistics(train_dataset.dataset_statistics, run_dir)
+        if cfg.patch:
+            out_path = run_dir / "dataset_statistics.json"
+            with open(out_path, "w") as f_json:
+                json.dump(train_dataset.dataset_statistics, f_json, indent=2)
+        else:
+            save_dataset_statistics(train_dataset.dataset_statistics, run_dir)
 
     # Create collator and dataloader
-    collator = PaddedCollatorForActionPrediction(
-        processor.tokenizer.model_max_length, processor.tokenizer.pad_token_id, padding_side="right"
-    )
-    dataloader = DataLoader(
-        train_dataset,
-        batch_size=cfg.batch_size,
-        sampler=None,
-        collate_fn=collator,
-        num_workers=0,  # Important: Set to 0 if using RLDS, which uses its own parallelism
-    )
+    if cfg.patch:
+        collator = VLAAdapterCollator()
+        # sampler = DistributedSampler(
+        #     dataset=train_dataset,
+        #     num_replicas=world_size,  # 总的 GPU 数量
+        #     rank=rank,  # 当前进程的全局 rank
+        #     shuffle=True,  # 是否打乱数据
+        #     seed=42  # 随机种子，确保不同 epoch 打乱顺序一致
+        # )
+        dataloader = DataLoader(
+            train_dataset,
+            batch_size=cfg.batch_size,
+            sampler=None,
+            collate_fn=collator,
+            num_workers=4,
+        )
+    else:
+        collator = PaddedCollatorForActionPrediction(
+            processor.tokenizer.model_max_length, processor.tokenizer.pad_token_id, padding_side="right"
+        )
+        dataloader = DataLoader(
+            train_dataset,
+            batch_size=cfg.batch_size,
+            sampler=None,
+            collate_fn=collator,
+            num_workers=0,  # Important: Set to 0 if using RLDS, which uses its own parallelism
+        )
     print('Len of dataloader: ', len(dataloader))
     if cfg.use_val_set:
         val_batch_size = cfg.batch_size
@@ -1013,10 +1077,14 @@ def finetune(cfg: FinetuneConfig) -> None:
     }
 
     # Start training
-    with tqdm.tqdm(total=cfg.max_steps, leave=False) as progress:
+    # with tqdm.tqdm(total=cfg.max_steps, leave=False) as progress:
+    #
+    batch_idx = 0
+    for _ in tqdm.tqdm(range(cfg.max_steps), leave=False):
         vla.train()
         optimizer.zero_grad()
-        for batch_idx, batch in enumerate(dataloader):
+        for _, batch in enumerate(dataloader):
+            batch_idx += 1
             # Compute training metrics and loss
             compute_diffusion_l1 = (cfg.use_l1_regression and batch_idx % cfg.diffusion_sample_freq == 0) or (cfg.use_diffusion and batch_idx % cfg.diffusion_sample_freq == 0)
             loss, metrics = run_forward_pass(
@@ -1079,7 +1147,6 @@ def finetune(cfg: FinetuneConfig) -> None:
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-                progress.update()
 
             # Save model checkpoint: either keep latest checkpoint only or all checkpoints
             if gradient_step_idx > 0 and log_step % cfg.save_freq == 0:
@@ -1116,10 +1183,10 @@ def finetune(cfg: FinetuneConfig) -> None:
                 # Set model back to training mode after validation
                 vla.train()
 
-            # Stop training when max_steps is reached
-            if log_step == cfg.max_steps:
-                print(f"Max step {cfg.max_steps} reached! Stopping training...")
-                break
+        # Stop training when max_steps is reached
+        if log_step >= cfg.max_steps:
+            print(f"Max step {cfg.max_steps} reached! Stopping training...")
+            break
 
 
 if __name__ == "__main__":

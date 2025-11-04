@@ -34,7 +34,7 @@ class L1RegressionActionHead(nn.Module):
         self.hidden_dim = hidden_dim
         self.model = MLPResNet(
             num_blocks=24, 
-            input_dim=input_dim*ACTION_DIM, 
+            input_dim=input_dim*action_dim,
             hidden_dim=hidden_dim, 
             output_dim=action_dim,
             use_pro_version=use_pro_version

@@ -54,7 +54,7 @@ class ActionTokenizer:
 
         # [Contract] Set "action_token_begin_idx" based on `self.tokenizer.vocab_size - (self.n_bins + 1)`
         #   =>> Assumes we're always overwriting the final `n_bins` tokens of the vocabulary!
-        self.action_token_begin_idx: int = int(self.tokenizer_len - (self.n_bins + 1))
+        self.action_token_begin_idx: int = int(self.tokenizer_len - (self.n_bins + 1))#todo (self.n_bins - 1) ==255
         self.action_token_end_idx: int = int(self.tokenizer_len)
 
     def __call__(self, action: np.ndarray, use_minivlm) -> Union[str, List[str]]:

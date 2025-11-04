@@ -121,7 +121,7 @@ class RLDSBatchTransform:
         pixel_values = self.image_transform(img)
 
         # [CRITICAL] We do not want to take the loss for anything but the predicted action tokens!
-        labels[: -(action_chunk_len + 1)] = IGNORE_INDEX
+        labels[: -(action_chunk_len + 1)] = IGNORE_INDEX#todo 后65个保留 一个\n?
         if not self.predict_stop_token:
             labels[-1] = IGNORE_INDEX
 
