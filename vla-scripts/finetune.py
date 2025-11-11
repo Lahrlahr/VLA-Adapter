@@ -722,31 +722,6 @@ def finetune(cfg: FinetuneConfig) -> None:
     cfg.config_file_path = cfg.config_file_path.rstrip("/")
     print(f"Fine-tuning OpenVLA Model `{cfg.config_file_path}` on `{cfg.dataset_name}`")
 
-    if cfg.patch:
-        aa_CONSTANTS = {
-            "NUM_ACTIONS_CHUNK": 8,
-            "ACTION_DIM": 14,
-            "PROPRIO_DIM": 14,
-            "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS_Q99,
-        }
-        constants = aa_CONSTANTS
-        NUM_ACTIONS_CHUNK = constants["NUM_ACTIONS_CHUNK"]
-        ACTION_DIM = constants["ACTION_DIM"]
-        PROPRIO_DIM = constants["PROPRIO_DIM"]
-        ACTION_PROPRIO_NORMALIZATION_TYPE = constants["ACTION_PROPRIO_NORMALIZATION_TYPE"]
-    else:
-        LIBERO_CONSTANTS = {
-            "NUM_ACTIONS_CHUNK": 8,
-            "ACTION_DIM": 7,
-            "PROPRIO_DIM": 8,
-            "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS_Q99,
-        }
-        constants = LIBERO_CONSTANTS
-        NUM_ACTIONS_CHUNK = constants["NUM_ACTIONS_CHUNK"]
-        ACTION_DIM = constants["ACTION_DIM"]
-        PROPRIO_DIM = constants["PROPRIO_DIM"]
-        ACTION_PROPRIO_NORMALIZATION_TYPE = constants["ACTION_PROPRIO_NORMALIZATION_TYPE"]
-
     # Get experiment run ID
     # run_id = get_run_id(cfg)
     run_id = cfg.run_id_note
@@ -989,7 +964,7 @@ def finetune(cfg: FinetuneConfig) -> None:
 
     # Create training and optional validation datasets
     if cfg.patch:
-        train_dataset = VLAAdapterDataset(cfg.json_path, 8, processor)
+        train_dataset = VLAAdapterDataset(cfg.json_path, NUM_ACTIONS_CHUNK, processor)
     else:
         batch_transform = RLDSBatchTransform(
             action_tokenizer,
@@ -1031,17 +1006,20 @@ def finetune(cfg: FinetuneConfig) -> None:
     # Create collator and dataloader
     if cfg.patch:
         collator = VLAAdapterCollator()
-        # sampler = DistributedSampler(
-        #     dataset=train_dataset,
-        #     num_replicas=world_size,  # 总的 GPU 数量
-        #     rank=rank,  # 当前进程的全局 rank
-        #     shuffle=True,  # 是否打乱数据
-        #     seed=42  # 随机种子，确保不同 epoch 打乱顺序一致
-        # )
+        rank = int(os.environ.get("RANK", 0))  # 全局进程 rank（0 到 world_size-1）
+        world_size = int(os.environ.get("WORLD_SIZE", 1))  # 总进程数
+        sampler = DistributedSampler(
+            dataset=train_dataset,
+            num_replicas=world_size,  # 总进程数（通常等于 GPU 数）
+            rank=rank,  # 当前进程的全局 rank
+            shuffle=True,  # 每个 epoch 打乱顺序
+            seed=42,  # 全局一致的随机种子
+            drop_last=False  # 通常设为 False，除非 batch_size 对总样本数敏感
+        )
         dataloader = DataLoader(
             train_dataset,
             batch_size=cfg.batch_size,
-            sampler=None,
+            sampler=sampler,
             collate_fn=collator,
             num_workers=4,
         )
@@ -1184,9 +1162,9 @@ def finetune(cfg: FinetuneConfig) -> None:
                 vla.train()
 
         # Stop training when max_steps is reached
-        if log_step >= cfg.max_steps:
-            print(f"Max step {cfg.max_steps} reached! Stopping training...")
-            break
+        # if log_step >= cfg.max_steps:
+        #     print(f"Max step {cfg.max_steps} reached! Stopping training...")
+        #     break
 
 
 if __name__ == "__main__":

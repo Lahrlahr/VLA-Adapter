@@ -17,6 +17,8 @@ from prismatic.models.projectors import ProprioProjector
 from patch.data_transform import process_data1, process_data2, unnormolize_data
 from data_visual import ServerLog
 
+from dataset import EpisodicDataset
+
 DEVICE = torch.device("cuda:0")
 ACTION_DIM = 14
 proprio_dim = 14
@@ -166,7 +168,7 @@ class VlaAdapter(BasePolicy):
                 actions = self.action_head.predict_action(multi_layer_hidden_states,
                                                           proprio=data['proprio'],
                                                           proprio_projector=self.proprio_projector)
-                actions = actions.reshape(8, ACTION_DIM)
+                actions = actions.reshape(50, ACTION_DIM)
                 actions = actions.float().cpu()
 
         actions = unnormolize_data(self.stats, actions).detach().numpy()

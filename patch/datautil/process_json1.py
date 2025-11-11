@@ -3,86 +3,112 @@ import os.path
 
 import numpy as np
 from tqdm import tqdm
+from pathlib import Path
 import tyro
 from process_util import find_second_level_dirs, find_first_level_dirs
 
+load_json = 'episode.json'
+key_left = 'puppet/joint_position_left'
+key_right = 'puppet/joint_position_right'
+img_front = 'observations_rgb_images_camera_front_image'
+img_left = "observations_rgb_images_camera_left_wrist_image"
+img_right = "observations_rgb_images_camera_right_wrist_image"
 
-def load_and_filter_episodes(json_path, min_length=10, pad=True):
-    with open(json_path, 'r') as f:
-        data = json.load(f)  # dict: {episode_0: {step_0: {}, step_1: {}}, ...}
+def get_last_two(path):
+    p = Path(path)
+    if len(p.parts) < 2:
+        return None  # 路径太短
+    return "/".join(p.parts[-2:])
 
-    key_left = 'puppet/joint_position_left'
-    key_right = 'puppet/joint_position_right'
+def load_and_filter_episodes(dir_path, min_length=50, pad=True):
+    if not os.path.exists(os.path.join(dir_path, load_json)):
+        return []
+    with open(os.path.join(dir_path, load_json), 'r') as f:
+        data = json.load(f)
 
-    filtered_episodes = {}
+    change = False
+    episode_dict = {}
+    episode_num = 0
+    for episode in tqdm(data.values(), desc="Processing Episodes", total=len(data)):
+        step_dict = {}
+        step_num = 0
+        for step in episode.values():
+            step['prompt'] = 'Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate.'
+            step[img_front] = get_last_two(step[img_front])
+            step[img_left] = get_last_two(step[img_left])
+            step[img_right] = get_last_two(step[img_right])
+            change = True
 
-    total_original_steps = 0
-    total_filtered_steps = 0
-    dropped_episodes = 0
+            if not (os.path.exists(os.path.join(dir_path, step[img_front])) and os.path.exists(
+                    os.path.join(dir_path, step[img_left])) and os.path.exists(os.path.join(dir_path, step[img_right]))):
+                change = True
+                continue
 
-    for ep_name, episode in tqdm(data.items(), desc="Processing Episodes", total=len(data)):
-        steps = list(episode.items())
-        if not steps:
-            continue  # 空 episode 直接跳过
+            if step_num == 0:
+                step_dict[f'step_{step_num}'] = step
+                step_num += 1
 
-        if not os.path.isdir(os.path.join('/data/share_nips/robot/aidlux/cxg/sandwich/',ep_name)):
-            continue
+                prev_left = np.round(step.get(key_left), 3)
+                prev_right = np.round(step.get(key_right), 3)
+                previous_14d = np.concatenate([prev_left, prev_right])
+                continue
 
-        total_original_steps += len(steps)
-
-        # 初始化第一个 step
-        prev_step_name, prev_step_data = steps[0]
-        prev_left = np.round(prev_step_data.get(key_left), 3)
-        prev_right = np.round(prev_step_data.get(key_right), 3)
-
-        filtered_step_list = [prev_step_data]  # 保留第一个 step
-        # if pad:
-        #     for i in range(50):
-        #         filtered_step_list.append(prev_step_data)
-        #     renamed_steps = {f"step_{i}": step_data for i, step_data in enumerate(filtered_step_list)}
-        #     filtered_episodes[ep_name] = renamed_steps
-        #     continue
-
-        for step_name, step_data in steps[1:]:
-            curr_left = np.round(step_data.get(key_left), 3)
-            curr_right = np.round(step_data.get(key_right), 3)
-
+            curr_left = np.round(step.get(key_left), 3)
+            curr_right = np.round(step.get(key_right), 3)
             current_14d = np.concatenate([curr_left, curr_right])
+            if np.array_equal(current_14d, previous_14d):
+                change = True
+                continue
+
+            step_dict[f'step_{step_num}'] = step
+            step_num += 1
+
+            prev_left = curr_left.copy()
+            prev_right = curr_right.copy()
             previous_14d = np.concatenate([prev_left, prev_right])
 
-            if not np.array_equal(current_14d, previous_14d):
-                filtered_step_list.append(step_data)
-                prev_left = curr_left.copy()
-                prev_right = curr_right.copy()
+        if len(step_dict) < min_length:
+            change = True
+            continue
 
-        total_filtered_steps += len(filtered_step_list)
+        episode_dict[f'episode_{episode_num}'] = step_dict
+        episode_num += 1
 
-        if len(filtered_step_list) >= min_length:
-            # 重新命名 step 为 step_0, step_1, ...
-            renamed_steps = {f"step_{i}": step_data for i, step_data in enumerate(filtered_step_list)}
-            filtered_episodes[ep_name] = renamed_steps
-        else:
-            dropped_episodes += 1
+    if change == True:
+        return episode_dict
+    else:
+        return []
 
-    # 打印统计信息
-    removed_count = total_original_steps - total_filtered_steps
-    print(f"原始总 step 数: {total_original_steps}")
-    print(f"去重后总 step 数: {total_filtered_steps}")
-    print(f"共过滤掉 {removed_count} 个重复的 step")
-    print(f"共丢弃 {dropped_episodes} 个长度小于 {min_length} 的 episode")
-    print(f"最终保留 {len(filtered_episodes)} 个 episode")
 
-    return filtered_episodes
+def aa(root_dirs):
+    if ',' in root_dirs:
+        root_dirs = root_dirs.split(',')
+    else:
+        root_dirs = [root_dirs]
+
+    return root_dirs
+
 
 def main():
-    # for dir_path in find_first_level_dirs(root_dir):
-    for dir_path in ['/data/share_nips/robot/aidlux/cxg/sandwich_reset/']:
-        # if not os.path.exists(os.path.join(dir_path, 'data.json')):
-        #     continue
-        data = load_and_filter_episodes(os.path.join(dir_path, 'episode.json'))
+    # for root_dir in aa(
+    #         '/data/share_nips/robot/ario1/wipe_the_table/,/data/share_nips/robot/ario1/take_the_pen_out_of_the_pen_holder/,/data/share_nips/robot/ario1/take_the_glasses_out_of_the_glasses_case/,/data/share_nips/robot/ario1/sort_the_fruits/,/data/share_nips/robot/ario1/sort_the_blocks/,/data/share_nips/robot/ario1/put_the_pen_into_the_pen_holder/,/data/share_nips/robot/ario1/put_the_glasses_into_the_glasses_case/,/data/share_nips/robot/ario1/place_the_fork/,/data/share_nips/robot/ario1/fold_the_towel/,/data/share_nips/robot/ario1/fold_the_shorts/,/data/share_nips/robot/ario1/cap_the_pen/'):
+    #     for dir_path in find_first_level_dirs(root_dir):
+    #         # for dir_path in ['/data/share_nips/robot/aidlux/cxg/sandwich_reset/']:
+    #         data = load_and_filter_episodes(dir_path)
+    #         if not data:
+    #             continue
+    #         with open(os.path.join(dir_path, 'data.json'), 'w') as f:
+    #             json.dump(data, f, indent=2)
+    #         print(f"成功保存🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️, {dir_path}")
+
+    for dir_path in aa('/data/share_nips/robot/aidlux/cxg/sandwich_1010,/data/share_nips/robot/aidlux/cxg/sandwich_1009,/data/share_nips/robot/aidlux/cxg/sandwich,/data/share_nips/robot/aidlux/cxg/sandwich2,/data/share_nips/robot/aidlux/cxg/sandwich_reset'):
+        data = load_and_filter_episodes(dir_path)
+        if not data:
+            continue
         with open(os.path.join(dir_path, 'data.json'), 'w') as f:
             json.dump(data, f, indent=2)
         print(f"成功保存🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️, {dir_path}")
 
+
 if __name__ == "__main__":
-     tyro.cli(main)
+    tyro.cli(main)

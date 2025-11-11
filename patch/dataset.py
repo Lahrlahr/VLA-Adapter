@@ -6,7 +6,7 @@ import json
 import random
 from PIL import Image
 from dataclasses import dataclass
-from .data_transform import process_data1, process_data2
+from patch.data_transform import process_data1, process_data2
 from patch.constant import *
 
 def get_last_two(path):
@@ -46,6 +46,7 @@ def preprocess_dataset(json_paths, seed: int = 42):
         json_paths = json_paths.split(',')
     else:
         json_paths = [json_paths]
+
     all_episodes = []
     for json_path in json_paths:
         with open(json_path, 'r') as f:
@@ -56,7 +57,50 @@ def preprocess_dataset(json_paths, seed: int = 42):
             for step_data in episode_data.values():
                 for key, value in step_data.items():
                     if key.startswith('observations'):
-                        full_path = os.path.join(json_dir, get_last_two(value))
+                        full_path = os.path.join(json_dir, value)
+                        step_data[key] = full_path
+                all_steps.append(step_data)
+            all_episodes.append(all_steps)
+
+    norm_stats = get_stats(all_episodes)
+
+    generator = torch.Generator().manual_seed(seed)
+    indices = torch.randperm(len(all_episodes), generator=generator).tolist()
+    train_episodes = [all_episodes[i] for i in indices]
+
+    return train_episodes, norm_stats
+
+def find_first_level_dirs(root_dir):
+    first_level_dirs = []
+    for item_name in os.listdir(root_dir):
+        item_path = os.path.join(root_dir, item_name)
+        if os.path.isdir(item_path):
+            first_level_dirs.append(item_path)
+    return first_level_dirs
+
+def preprocess_dataset1(root_dirs, seed: int = 42):
+    if ',' in root_dirs:
+        root_dirs = root_dirs.split(',')
+    else:
+        root_dirs = [root_dirs]
+
+    json_paths = []
+    for root_dir in root_dirs:
+        for dir_path in find_first_level_dirs(root_dir):
+            if os.path.exists(os.path.join(dir_path, 'data.json')):
+                json_paths.append(os.path.join(dir_path, 'data.json'))
+
+    all_episodes = []
+    for json_path in json_paths:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        json_dir = os.path.dirname(json_path)
+        for episode_data in data.values():
+            all_steps = []
+            for step_data in episode_data.values():
+                for key, value in step_data.items():
+                    if key.startswith('observations'):
+                        full_path = os.path.join(json_dir, value)
                         step_data[key] = full_path
                 all_steps.append(step_data)
             all_episodes.append(all_steps)
@@ -72,17 +116,23 @@ def preprocess_dataset(json_paths, seed: int = 42):
 class EpisodicDataset(torch.utils.data.Dataset):
     def __init__(self, json_path, num_queries):
         self.episode_list , self.norm_stats = preprocess_dataset(json_path)
+        # self.episode_list, self.norm_stats = preprocess_dataset1(json_path)
         self.num_queries = num_queries
 
+        self.episode_lengths = [len(ep) for ep in self.episode_list]
+        self._cum_lengths = np.cumsum(self.episode_lengths)
+        self.total_steps = int(self._cum_lengths[-1])
+
     def __len__(self) -> int:
-        return len(self.episode_list)
+        return self.total_steps
 
     def __getitem__(self, idx: int):
-        episode_data = self.episode_list[idx]
-        start_idx = random.randint(0, len(episode_data) - 1)
+        episode_idx = np.searchsorted(self._cum_lengths, idx, side='right')
+
+        start_idx = idx - (self._cum_lengths[episode_idx - 1] if episode_idx > 0 else 0)
         end_idx = start_idx + self.num_queries + 1
-        indices = [min(i, len(episode_data) - 1) for i in range(start_idx, end_idx)]
-        chunk = [episode_data[i] for i in indices]
+        indices = [min(i, self.episode_lengths[episode_idx] - 1) for i in range(start_idx, end_idx)]
+        chunk = [self.episode_list[episode_idx][i] for i in indices]
 
         current_step = chunk[0]
         front_image = np.array(Image.open(current_step[DATASET_FRONT_IMAGE]).convert("RGB"))
