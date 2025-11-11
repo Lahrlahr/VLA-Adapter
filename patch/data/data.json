@@ -1,0 +1,268 @@
+{
+  "episode_0": {
+    "step_0": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_0_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_0_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_0_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.006384504,
+        -0.008722,
+        0.026270664000000003,
+        0.006715940000000001,
+        0.07343924,
+        0.0,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_1": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_1_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_1_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_1_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.006384504,
+        -0.0030527,
+        0.026270664000000003,
+        0.006715940000000001,
+        0.07549763200000001,
+        0.0,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_2": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_2_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_2_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_2_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        -0.011164160000000001,
+        0.0047971,
+        0.024962364000000004,
+        0.006715940000000001,
+        0.10539664800000001,
+        0.0,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_3": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_3_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_3_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_3_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        -0.021054908000000004,
+        0.0,
+        0.017914988,
+        0.006715940000000001,
+        0.10930410400000001,
+        0.0,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_4": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_4_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_4_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_4_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        -0.025450796000000005,
+        -0.005634412000000001,
+        -0.008216124,
+        0.0,
+        0.10930410400000001,
+        0.0,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_5": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_5_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_5_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_5_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        -0.022991192000000004,
+        -0.00819868,
+        -0.052122672,
+        0.0,
+        0.119787948,
+        -0.006733384,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_6": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_6_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_6_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_6_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        -0.007570696,
+        -0.00819868,
+        -0.097965504,
+        -0.016275252,
+        0.132173188,
+        -0.016519468,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_7": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_7_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_7_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_7_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.007919576000000001,
+        -0.00819868,
+        -0.126155008,
+        -0.02459604,
+        0.13485956400000002,
+        -0.028398832,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_8": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_8_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_8_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_8_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.017234672,
+        -0.00819868,
+        -0.147070364,
+        -0.028852376,
+        0.137702936,
+        -0.034085576,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_9": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_9_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_9_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_9_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.033161044,
+        -0.00819868,
+        -0.164723692,
+        -0.031992296,
+        0.137702936,
+        -0.040033980000000004,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    },
+    "step_10": {
+      "observations_rgb_images_camera_front_image": "episode_0/step_10_front.jpg",
+      "observations_rgb_images_camera_left_wrist_image": "episode_0/step_10_left.jpg",
+      "observations_rgb_images_camera_right_wrist_image": "episode_0/step_10_right.jpg",
+      "puppet/joint_position_left": [
+        0.0,
+        -0.0017618440000000003,
+        0.01238524,
+        0.0,
+        0.022938860000000002,
+        0.0,
+        0.0004
+      ],
+      "puppet/joint_position_right": [
+        0.038429132,
+        -0.00819868,
+        -0.17611462400000003,
+        -0.03719060800000001,
+        0.14148828400000002,
+        -0.043191344,
+        0.0
+      ],
+      "prompt": "Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate."
+    }
+  }
+}
