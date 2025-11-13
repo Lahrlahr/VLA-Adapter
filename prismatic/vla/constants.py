@@ -54,7 +54,7 @@ BRIDGE_CONSTANTS = {
 }
 
 aa_CONSTANTS = {
-            "NUM_ACTIONS_CHUNK": 3,
+            "NUM_ACTIONS_CHUNK": 50,
             "ACTION_DIM": 14,
             "PROPRIO_DIM": 14,
             "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS_Q99,

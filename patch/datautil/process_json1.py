@@ -7,7 +7,7 @@ from pathlib import Path
 import tyro
 from process_util import find_second_level_dirs, find_first_level_dirs
 
-load_json = 'episode.json'
+load_json = 'sandwich_1112_2_data.json'
 key_left = 'puppet/joint_position_left'
 key_right = 'puppet/joint_position_right'
 img_front = 'observations_rgb_images_camera_front_image'
@@ -33,7 +33,7 @@ def load_and_filter_episodes(dir_path, min_length=50, pad=True):
         step_dict = {}
         step_num = 0
         for step in episode.values():
-            step['prompt'] = 'Use the right arm to put the vegetables into the right plate and use the left arm to put the breads into the left plate.'
+            step['prompt'] = 'Use the right arm to grab the breads and use the left arm to grab the meat and vegetables to make a sandwich.'
             step[img_front] = get_last_two(step[img_front])
             step[img_left] = get_last_two(step[img_left])
             step[img_right] = get_last_two(step[img_right])
@@ -101,7 +101,7 @@ def main():
     #             json.dump(data, f, indent=2)
     #         print(f"成功保存🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️, {dir_path}")
 
-    for dir_path in aa('/data/share_nips/robot/aidlux/cxg/sandwich_1010,/data/share_nips/robot/aidlux/cxg/sandwich_1009,/data/share_nips/robot/aidlux/cxg/sandwich,/data/share_nips/robot/aidlux/cxg/sandwich2,/data/share_nips/robot/aidlux/cxg/sandwich_reset'):
+    for dir_path in aa('/data/share_nips/robot/aidlux/cxg/sandwich_1112_2/'):
         data = load_and_filter_episodes(dir_path)
         if not data:
             continue
