@@ -7,7 +7,7 @@ from pathlib import Path
 import tyro
 from process_util import find_second_level_dirs, find_first_level_dirs
 
-load_json = 'sandwich_1112_2_data.json'
+load_json = 'sandwich_1113_data.json'
 key_left = 'puppet/joint_position_left'
 key_right = 'puppet/joint_position_right'
 img_front = 'observations_rgb_images_camera_front_image'
@@ -101,7 +101,7 @@ def main():
     #             json.dump(data, f, indent=2)
     #         print(f"成功保存🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️🤷‍♂️, {dir_path}")
 
-    for dir_path in aa('/data/share_nips/robot/aidlux/cxg/sandwich_1112_2/'):
+    for dir_path in aa('/data/share_nips/robot/aidlux/cxg/sandwich_1113/'):
         data = load_and_filter_episodes(dir_path)
         if not data:
             continue
